@@ -1,0 +1,109 @@
+# Test configuration for Kuipernet Upload (generated from nginx.conf.in).
+load_module @MODULE@;
+
+user root;
+worker_processes 1;
+error_log @RUN@/error.log info;
+pid @RUN@/nginx.pid;
+
+events { worker_connections 256; }
+
+http {
+    log_format shield '$status $request_method $uri shield=$upload_shield_action '
+                      'rule=$upload_shield_rule len=$request_length';
+    access_log @RUN@/access.log shield;
+
+    client_body_temp_path @RUN@/client_body_temp;
+    proxy_temp_path       @RUN@/proxy_temp;
+    fastcgi_temp_path     @RUN@/fastcgi_temp;
+
+    client_max_body_size 64m;
+
+    fastcgi_param REQUEST_METHOD $request_method;
+    fastcgi_param REQUEST_URI    $request_uri;
+    fastcgi_param CONTENT_TYPE   $content_type;
+    fastcgi_param CONTENT_LENGTH $content_length;
+    fastcgi_param SCRIPT_FILENAME /srv/app$fastcgi_script_name;
+
+    # ---- 1. policies attached to individual paths --------------------------
+    server {
+        listen 127.0.0.1:@PORT1@;
+        http2 on;
+
+        # limits shared by the path tests below
+        upload_shield_max_file_size        1m;
+        upload_shield_max_files            4;
+        upload_shield_max_parts            8;
+        upload_shield_max_part_header_size 512;
+        upload_shield_max_field_size       1k;
+
+        location /proxy/off/     { proxy_pass http://127.0.0.1:@HTTP@; }
+        location /fcgi/off/      { fastcgi_pass 127.0.0.1:@FCGI@; }
+
+        location /proxy/monitor/ { upload_shield monitor; proxy_pass http://127.0.0.1:@HTTP@; }
+        location /proxy/block/   { upload_shield block;   proxy_pass http://127.0.0.1:@HTTP@; }
+        location /fcgi/monitor/  { upload_shield monitor; fastcgi_pass 127.0.0.1:@FCGI@; }
+        location /fcgi/block/    { upload_shield block;   fastcgi_pass 127.0.0.1:@FCGI@; }
+
+        # request buffering switched off: BLOCK cannot be guaranteed here
+        location /nobuf/proxy/monitor/ { upload_shield monitor; proxy_request_buffering off;   proxy_pass http://127.0.0.1:@HTTP@; }
+        location /nobuf/proxy/block/   { upload_shield block;   proxy_request_buffering off;   proxy_pass http://127.0.0.1:@HTTP@; }
+        location /nobuf/fcgi/monitor/  { upload_shield monitor; fastcgi_request_buffering off; fastcgi_pass 127.0.0.1:@FCGI@; }
+        location /nobuf/fcgi/block/    { upload_shield block;   fastcgi_request_buffering off; fastcgi_pass 127.0.0.1:@FCGI@; }
+
+        # whole-request size set in the shield (smaller than nginx's 64m)
+        location /size/proxy/block/   { upload_shield block;   upload_shield_max_body_size 2m; proxy_pass http://127.0.0.1:@HTTP@; }
+        location /size/fcgi/block/    { upload_shield block;   upload_shield_max_body_size 2m; fastcgi_pass 127.0.0.1:@FCGI@; }
+        location /size/proxy/monitor/ { upload_shield monitor; upload_shield_max_body_size 2m; proxy_pass http://127.0.0.1:@HTTP@; }
+        # shield value larger than nginx's limit: nginx wins, reported at start
+        location /size/conflict/      { upload_shield block;   upload_shield_max_body_size 128m; proxy_pass http://127.0.0.1:@HTTP@; }
+
+        # whole-body read timeout set in the shield
+        location /time/proxy/block/   { upload_shield block;   upload_shield_body_timeout 2s; proxy_pass http://127.0.0.1:@HTTP@; }
+        location /time/fcgi/block/    { upload_shield block;   upload_shield_body_timeout 2s; fastcgi_pass 127.0.0.1:@FCGI@; }
+        location /time/proxy/monitor/ { upload_shield monitor; upload_shield_body_timeout 2s; proxy_pass http://127.0.0.1:@HTTP@; }
+        # same conflict with short values: a client that keeps trickling is
+        # still ended by the Shield's whole-body timeout
+        location /time/longer/        { upload_shield block;   upload_shield_body_timeout 4s; client_body_timeout 2s; proxy_pass http://127.0.0.1:@HTTP@; }
+        # shield timeout longer than client_body_timeout: reported at start
+        location /time/conflict/      { upload_shield block;   upload_shield_body_timeout 30s; client_body_timeout 3s; proxy_pass http://127.0.0.1:@HTTP@; }
+
+        # resource measurements
+        location /big/off/     { client_max_body_size 2g; proxy_pass http://127.0.0.1:@HTTP@; }
+        location /big/monitor/ { client_max_body_size 2g; upload_shield monitor; upload_shield_max_file_size 0; proxy_pass http://127.0.0.1:@HTTP@; }
+        location /big/block/   { client_max_body_size 2g; upload_shield block;   upload_shield_max_file_size 0; proxy_pass http://127.0.0.1:@HTTP@; }
+    }
+
+    # ---- 2. policy attached to a whole virtual host (BLOCK) -----------------
+    server {
+        listen 127.0.0.1:@PORT2@;
+
+        upload_shield                        block;
+        upload_shield_deny_session_progress  on;
+        upload_shield_max_part_headers       4;
+        upload_shield_max_field_name_size    128;
+        upload_shield_max_field_name_depth   4;
+
+        location /          { fastcgi_pass 127.0.0.1:@FCGI@; }
+        location /api/      { proxy_pass http://127.0.0.1:@HTTP@; }
+        # a path of this host that never takes uploads
+        location /noupload/ { upload_shield_deny_multipart on; fastcgi_pass 127.0.0.1:@FCGI@; }
+        # a path that keeps using PHP's upload progress feature
+        location /progress/ { upload_shield_deny_session_progress off; fastcgi_pass 127.0.0.1:@FCGI@; }
+    }
+
+    # ---- 3. the same host-wide policy in MONITOR ----------------------------
+    server {
+        listen 127.0.0.1:@PORT3@;
+
+        upload_shield                        monitor;
+        upload_shield_deny_session_progress  on;
+        upload_shield_max_part_headers       4;
+        upload_shield_max_field_name_size    128;
+        upload_shield_max_field_name_depth   4;
+
+        location /          { fastcgi_pass 127.0.0.1:@FCGI@; }
+        location /api/      { proxy_pass http://127.0.0.1:@HTTP@; }
+        location /noupload/ { upload_shield_deny_multipart on; fastcgi_pass 127.0.0.1:@FCGI@; }
+    }
+}

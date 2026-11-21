@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal Tomcat configuration for the Kuipernet Upload end-to-end tests. -->
+<Server port="-1" shutdown="SHUTDOWN">
+  <Service name="Catalina">
+    <Connector port="@TOMCAT@" address="127.0.0.1" protocol="HTTP/1.1"
+               maxPostSize="-1" maxPartCount="50" />
+    <Engine name="Catalina" defaultHost="localhost">
+      <Host name="localhost" appBase="webapps" unpackWARs="false" autoDeploy="false">
+        <Valve className="org.apache.catalina.valves.AccessLogValve"
+               directory="logs" prefix="access" suffix=".log" rotatable="false"
+               buffered="false"
+               pattern="%t %m %U %s cl=%{Content-Length}i tid=%{X-Test-Id}i" />
+      </Host>
+    </Engine>
+  </Service>
+</Server>
