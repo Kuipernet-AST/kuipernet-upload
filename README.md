@@ -21,9 +21,9 @@ The repository contains a shared C99 inspection engine, an Nginx module, and an 
 
 ## PHP2Shell mitigation guidance
 
-In tested BLOCK configurations, Kuipernet Upload stopped multipart requests that violated the configured policies before they reached PHP-FPM, including requests with a violation in the final part.
+Kuipernet Upload provides frontend multipart limits recommended in the PHP advisory for [CVE-2026-109618](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w), including limits on the number of parts, headers per part, and files per request. In tested BLOCK configurations, PHP-FPM received none of the requests rejected by these policies, including requests that violated a limit in the final multipart part.
 
-The [PHP2Shell mitigation guide](docs/PHP2SHELL.md) explains how to apply these controls. Mitigation of CVE-2026-109618 and CVE-2026-109619 remains unverified on vulnerable PHP builds.
+See the [PHP2Shell mitigation guide](docs/PHP2SHELL.md) for configuration guidance and test coverage. Mitigation of CVE-2026-109618 and CVE-2026-109619 on vulnerable PHP builds remains unverified.
 
 ## Repository layout
 
