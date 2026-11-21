@@ -1,3 +1,5 @@
+![Kuipernet](docs/kuipernet-logo.png)
+
 # Kuipernet Upload
 
 Kuipernet Upload is a standalone web server module for inspecting `multipart/form-data` requests. It applies upload size, part count, and other multipart policies by route or virtual host. In supported Nginx configurations with request buffering enabled, it blocks noncompliant requests before they reach the backend and forwards approved uploads intact.
