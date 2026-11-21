@@ -19,6 +19,14 @@ The repository contains a shared C99 inspection engine, an Nginx module, and an 
 | [PHP2Shell](docs/PHP2SHELL.md) | Policy enforcement results and the scope of CVE mitigation evidence |
 | [Changelog](docs/CHANGES.md) | Changes by version |
 
+## PHP2Shell mitigation guidance
+
+Kuipernet Upload provides multipart upload controls for Nginx and Apache HTTP Server. In supported BLOCK configurations, it rejects requests that violate configured upload policies before they reach the backend.
+
+Testing confirmed that requests rejected by those policies did not reach PHP-FPM. Mitigation of PHP2Shell (CVE-2026-109618 and CVE-2026-109619) on vulnerable PHP builds remains unverified.
+
+See the [PHP2Shell mitigation guide](docs/PHP2SHELL.md) for configuration guidance and test coverage.
+
 ## Repository layout
 
 | Path | Purpose |
